@@ -43,17 +43,24 @@ class SpringResilienceDemoApplication {
 class SomeController {
     @Autowired
     private lateinit var someService: SomeService
+    @Autowired
+    private lateinit var reactiveCircuitBreakerFactory: ReactiveCircuitBreakerFactory<*, *>
 
     @GetMapping("/process", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
     fun somRequest(@RequestParam id: Int): Mono<String> {
-        return someService.process(id)
+        return reactiveCircuitBreakerFactory
+                .create("someService")
+                .run(someService.process(id), Function {
+                    Mono.just("just recovered from error! => ${it.localizedMessage}")
+                })
+
     }
 }
 
 @Service
 class SomeService {
     fun process(id: Int): Mono<String> {
-        return if (id < 1) Mono.error{ IllegalArgumentException("meaw!! I am throwing error") }
+        return if (id < 1) Mono.error{ IllegalArgumentException("oh!! invalid id") }
         else Mono.just("Id Found!")
     }
 }
